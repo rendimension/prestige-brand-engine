@@ -1,6 +1,6 @@
-# PRESTIGE 360 Brand Engine v2.0
-# Exact carousel style matching
-# Supports: Light theme, Image-heavy theme, auto-alternation
+# PRESTIGE 360 Brand Engine v3.0
+# Dark gradient header bar for white logo
+# White tagline text
 
 from flask import Flask, request, send_file, jsonify, send_from_directory
 from PIL import Image, ImageDraw, ImageFont
@@ -35,7 +35,7 @@ FONT_BOLD_PATH = "Montserrat-Bold.ttf"
 # =========================
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-GRAY_LIGHT = (120, 120, 120)
+GRAY_LIGHT = (180, 180, 180)
 GRAY_SUBTITLE = (80, 80, 80)
 
 # Prestige Orange Gradient Colors
@@ -49,7 +49,8 @@ PRESTIGE_ORANGE_MID = (248, 78, 42)      # Middle color for solid use
 DEFAULT_BRAND_NAME = os.environ.get('BRAND_NAME', 'PRESTIGE 360')
 DEFAULT_TAGLINE = os.environ.get('TAGLINE', 'Commercial Design From Concept to Opening')
 DEFAULT_WEBSITE = os.environ.get('WEBSITE_URL', 'www.prestige360design.com')
-LOGO_URL = os.environ.get('LOGO_URL', 'https://i.imgur.com/IvU0SRy.png')
+# NEW: Cloudinary URL for white logo
+LOGO_URL = os.environ.get('LOGO_URL', 'https://res.cloudinary.com/dotimxrnh/image/upload/v1772677159/WHITE_Prestige_y3ucpo.png')
 
 # =========================
 # Layout Configuration - VERTICAL 4:5 for Instagram/Facebook
@@ -60,6 +61,9 @@ MARGIN_LEFT = 50
 MARGIN_RIGHT = 50
 MARGIN_TOP = 35
 MARGIN_BOTTOM = 50
+
+# Header gradient bar height
+HEADER_GRADIENT_HEIGHT = 100
 
 # =========================
 # Text Limits
@@ -88,7 +92,7 @@ orange_box_font = load_font(52, "orange_box_font")
 big_text_font = load_font(72, "big_text_font")
 description_font = load_font(28, "description_font")
 website_font = load_font(24, "website_font")
-tagline_font = load_font(20, "tagline_font")
+tagline_font = load_font(18, "tagline_font")
 
 # Cached logo
 cached_logo = None
@@ -118,18 +122,19 @@ def fit_cover(img, target_w, target_h):
 
 
 def load_logo():
-    """Load Prestige logo from URL (cached)"""
+    """Load Prestige logo from Cloudinary URL (cached)"""
     global cached_logo
     if cached_logo is not None:
         return cached_logo.copy()
     
     try:
-        resp = requests.get(LOGO_URL, timeout=10)
+        print(f"🔄 Loading logo from: {LOGO_URL}")
+        resp = requests.get(LOGO_URL, timeout=15)
         resp.raise_for_status()
         logo = Image.open(io.BytesIO(resp.content))
         logo = logo.convert("RGBA")
-        # Resize to fit header - max height 50px
-        max_height = 50
+        # Resize to fit header - max height 45px
+        max_height = 45
         ratio = max_height / logo.height
         new_width = int(logo.width * ratio)
         logo = logo.resize((new_width, max_height), Image.LANCZOS)
@@ -139,6 +144,22 @@ def load_logo():
     except Exception as e:
         print(f"⚠️ Could not load logo: {e}")
         return None
+
+
+def create_header_gradient(width, height):
+    """
+    Create dark gradient bar at top for white logo visibility
+    Like Hugo Brand Engine style
+    """
+    gradient = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    
+    for y in range(height):
+        # Strong at top, fades to transparent
+        alpha = int(200 * (1 - (y / height) ** 0.7))
+        for x in range(width):
+            gradient.putpixel((x, y), (0, 0, 0, alpha))
+    
+    return gradient
 
 
 def create_light_overlay(width, height, opacity=0.75):
@@ -151,10 +172,10 @@ def create_gradient_overlay(width, height):
     """Create gradient for image-heavy theme: dark at top and bottom"""
     overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     
-    # Top gradient (for logo visibility)
-    top_height = 120
+    # Top gradient (for logo visibility) - STRONGER
+    top_height = 140
     for y in range(top_height):
-        alpha = int(180 * (1 - y / top_height))
+        alpha = int(220 * (1 - (y / top_height) ** 0.6))
         for x in range(width):
             overlay.putpixel((x, y), (0, 0, 0, alpha))
     
@@ -309,8 +330,8 @@ def render_slide(image_source, headline="", big_text="", description="",
     Render Prestige 360 carousel slide
     
     Theme is auto-determined:
-    - Slide 1 and last slide = Light theme
-    - Middle slides = Image-heavy theme
+    - Slide 1 and last slide = Light theme (but with dark header gradient for logo)
+    - Middle slides = Image-heavy theme with gradients
     """
     
     # Determine theme based on slide position
@@ -341,6 +362,9 @@ def render_slide(image_source, headline="", big_text="", description="",
     if is_light_theme:
         overlay = create_light_overlay(CANVAS_WIDTH, CANVAS_HEIGHT, 0.78)
         canvas = Image.alpha_composite(canvas, overlay)
+        # ADD dark header gradient on TOP for white logo visibility
+        header_gradient = create_header_gradient(CANVAS_WIDTH, HEADER_GRADIENT_HEIGHT)
+        canvas = Image.alpha_composite(canvas, header_gradient)
         text_color = BLACK
         subtitle_color = GRAY_SUBTITLE
     else:
@@ -352,23 +376,21 @@ def render_slide(image_source, headline="", big_text="", description="",
     # Create draw object
     draw = ImageDraw.Draw(canvas)
     
-    # === HEADER: Logo ===
+    # === HEADER: Logo (WHITE logo on dark gradient) ===
     logo = load_logo()
     if logo:
         canvas.paste(logo, (MARGIN_LEFT, MARGIN_TOP), logo)
     
-    # === HEADER: Tagline (only on light theme, slide 1) ===
-    if is_light_theme and slide_number == 1:
+    # === HEADER: Tagline IN WHITE (always visible on dark gradient) ===
+    if slide_number == 1:
         tagline = DEFAULT_TAGLINE
-        bbox = draw.textbbox((0, 0), tagline, font=tagline_font)
-        tagline_width = bbox[2] - bbox[0]
-        # Position to the right of logo
         logo_width = logo.width if logo else 0
+        # Tagline in WHITE since it's on dark gradient
         draw.text(
-            (MARGIN_LEFT + logo_width + 20, MARGIN_TOP + 18),
+            (MARGIN_LEFT + logo_width + 20, MARGIN_TOP + 15),
             tagline,
             font=tagline_font,
-            fill=GRAY_LIGHT
+            fill=WHITE  # WHITE text on dark gradient
         )
     
     # === CONTENT AREA ===
@@ -436,18 +458,20 @@ def render_slide(image_source, headline="", big_text="", description="",
 def home():
     return jsonify({
         "service": "Prestige 360 Brand Engine",
-        "version": "2.0",
+        "version": "3.0",
         "status": "running",
         "brand": DEFAULT_BRAND_NAME,
+        "logo_url": LOGO_URL,
         "features": [
+            "dark_header_gradient",
+            "white_logo",
+            "white_tagline",
             "auto_theme_alternation",
             "orange_box_headlines",
             "text_wrapping",
-            "swipe_arrows",
-            "logo_support",
-            "light_and_image_themes"
+            "swipe_arrows"
         ],
-        "theme_pattern": "First and Last = Light, Middle = Image",
+        "theme_pattern": "First and Last = Light + Dark Header, Middle = Image",
         "canvas_size": f"{CANVAS_WIDTH}x{CANVAS_HEIGHT}",
         "fonts": {
             "Montserrat-Bold": os.path.isfile(FONT_BOLD_PATH),
@@ -460,8 +484,9 @@ def home():
 def health():
     return jsonify({
         'status': 'ok',
-        'version': '2.0',
+        'version': '3.0',
         'brand': 'Prestige 360',
+        'logo_url': LOGO_URL,
         'images_in_cache': len(generated_images)
     })
 
@@ -570,7 +595,7 @@ def render_slide_endpoint():
             "png_url": f"{base_url}/post_output/{filename}",
             "image_id": image_id,
             "slide_number": slide_number,
-            "theme_used": "light" if is_light else "image"
+            "theme_used": "light_with_dark_header" if is_light else "image"
         })
         
     except Exception as e:
@@ -640,7 +665,7 @@ def render_carousel_endpoint():
                 "slide_number": slide_number,
                 "download_url": f"{base_url}/download/{image_id}",
                 "png_url": f"{base_url}/post_output/{filename}",
-                "theme": "light" if (slide_number == 1 or slide_number == total_slides) else "image"
+                "theme": "light_with_dark_header" if (slide_number == 1 or slide_number == total_slides) else "image"
             })
         
         return jsonify({
@@ -656,11 +681,25 @@ def render_carousel_endpoint():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/clear-logo-cache', methods=['POST'])
+def clear_logo_cache():
+    """Force reload of logo from URL"""
+    global cached_logo
+    cached_logo = None
+    logo = load_logo()
+    return jsonify({
+        "success": True,
+        "logo_loaded": logo is not None,
+        "logo_url": LOGO_URL
+    })
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    print(f"🚀 Prestige 360 Brand Engine v2.0 starting on port {port}")
+    print(f"🚀 Prestige 360 Brand Engine v3.0 starting on port {port}")
     print(f"📍 Brand: {DEFAULT_BRAND_NAME}")
     print(f"📍 Logo: {LOGO_URL}")
     print(f"📍 Website: {DEFAULT_WEBSITE}")
-    print(f"🎨 Theme Pattern: First & Last = Light, Middle = Image")
+    print(f"🎨 Theme Pattern: First & Last = Light + Dark Header, Middle = Image")
+    print(f"✨ NEW: Dark header gradient for white logo visibility")
     app.run(host='0.0.0.0', port=port, debug=False)
