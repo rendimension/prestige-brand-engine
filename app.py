@@ -35,8 +35,8 @@ FONT_BOLD_PATH = "Montserrat-Bold.ttf"
 # =========================
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-GRAY_LIGHT = (180, 180, 180)
-GRAY_SUBTITLE = (80, 80, 80)
+GRAY_LIGHT = (120, 120, 120)  # Darker for better visibility on light backgrounds
+GRAY_SUBTITLE = (50, 50, 50)   # Much darker for subtitle text
 
 # Prestige Orange Gradient Colors
 PRESTIGE_ORANGE_START = (255, 49, 49)    # #FF3131
@@ -383,16 +383,16 @@ def render_slide(image_source, headline="", big_text="", description="",
         canvas.paste(logo, (MARGIN_LEFT, MARGIN_TOP), logo)
     
     # === HEADER: Tagline IN WHITE (always visible on dark gradient) ===
-    if slide_number == 1:
-        tagline = DEFAULT_TAGLINE
-        logo_width = logo.width if logo else 0
-        # Tagline in WHITE since it's on dark gradient
-        draw.text(
-            (MARGIN_LEFT + logo_width + 20, MARGIN_TOP + 15),
-            tagline,
-            font=tagline_font,
-            fill=WHITE  # WHITE text on dark gradient
-        )
+    # Show tagline on ALL slides for brand consistency
+    tagline = DEFAULT_TAGLINE
+    logo_width = logo.width if logo else 0
+    # Tagline in WHITE since it's on dark gradient
+    draw.text(
+        (MARGIN_LEFT + logo_width + 20, MARGIN_TOP + 15),
+        tagline,
+        font=tagline_font,
+        fill=WHITE  # WHITE text on dark gradient
+    )
     
     # === CONTENT AREA ===
     # Calculate vertical positions (centered in lower portion)
