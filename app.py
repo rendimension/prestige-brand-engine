@@ -146,16 +146,17 @@ def load_logo():
         return None
 
 
-def create_header_gradient(width, height):
+def create_header_gradient(width, canvas_height, gradient_height=100):
     """
     Create dark gradient bar at top for white logo visibility
     Like Hugo Brand Engine style
+    Returns full canvas size image with gradient only at top
     """
-    gradient = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    gradient = Image.new('RGBA', (width, canvas_height), (0, 0, 0, 0))
     
-    for y in range(height):
+    for y in range(gradient_height):
         # Strong at top, fades to transparent
-        alpha = int(200 * (1 - (y / height) ** 0.7))
+        alpha = int(200 * (1 - (y / gradient_height) ** 0.7))
         for x in range(width):
             gradient.putpixel((x, y), (0, 0, 0, alpha))
     
@@ -363,7 +364,7 @@ def render_slide(image_source, headline="", big_text="", description="",
         overlay = create_light_overlay(CANVAS_WIDTH, CANVAS_HEIGHT, 0.78)
         canvas = Image.alpha_composite(canvas, overlay)
         # ADD dark header gradient on TOP for white logo visibility
-        header_gradient = create_header_gradient(CANVAS_WIDTH, HEADER_GRADIENT_HEIGHT)
+        header_gradient = create_header_gradient(CANVAS_WIDTH, CANVAS_HEIGHT, HEADER_GRADIENT_HEIGHT)
         canvas = Image.alpha_composite(canvas, header_gradient)
         text_color = BLACK
         subtitle_color = GRAY_SUBTITLE
