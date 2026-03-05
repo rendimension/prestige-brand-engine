@@ -66,14 +66,14 @@ MARGIN_BOTTOM = 50
 HEADER_GRADIENT_HEIGHT = 100
 
 # =========================
-# Text Limits
+# Text Limits - ADJUSTED FOR BETTER FIT
 # =========================
 ORANGE_BOX_MAX_LINES = 2
-ORANGE_BOX_MAX_WIDTH = 700
+ORANGE_BOX_MAX_WIDTH = 650  # Reduced to prevent overflow
 BIG_TEXT_MAX_LINES = 3
-BIG_TEXT_MAX_WIDTH = 900
+BIG_TEXT_MAX_WIDTH = 850    # Reduced to prevent text cutting
 DESCRIPTION_MAX_LINES = 2
-DESCRIPTION_MAX_WIDTH = 900
+DESCRIPTION_MAX_WIDTH = 850
 
 # =========================
 # Load Fonts AT STARTUP
@@ -110,15 +110,24 @@ def cleanup_old_images():
 
 
 def fit_cover(img, target_w, target_h):
-    """Scale and crop to fill"""
+    """Scale and crop to fill - ensures image covers entire canvas"""
     img_w, img_h = img.size
+    print(f"📐 fit_cover: input {img_w}x{img_h} → target {target_w}x{target_h}")
+    
     scale = max(target_w / img_w, target_h / img_h)
     new_w = int(img_w * scale)
     new_h = int(img_h * scale)
+    
+    print(f"📐 fit_cover: scaling to {new_w}x{new_h} (scale: {scale:.2f})")
+    
     img = img.resize((new_w, new_h), Image.LANCZOS)
     left = (new_w - target_w) // 2
     top = (new_h - target_h) // 2
-    return img.crop((left, top, left + target_w, top + target_h))
+    
+    result = img.crop((left, top, left + target_w, top + target_h))
+    print(f"📐 fit_cover: final size {result.size}")
+    
+    return result
 
 
 def load_logo():
@@ -170,7 +179,7 @@ def create_light_overlay(width, height, opacity=0.75):
 
 
 def create_gradient_overlay(width, height):
-    """Create gradient for image-heavy theme: dark at top and bottom"""
+    """Create gradient for image-heavy theme: dark at top, CENTER BAND, and bottom"""
     overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     
     # Top gradient (for logo visibility) - STRONGER
@@ -180,11 +189,27 @@ def create_gradient_overlay(width, height):
         for x in range(width):
             overlay.putpixel((x, y), (0, 0, 0, alpha))
     
-    # Bottom gradient (for text visibility)
-    bottom_height = 500
+    # CENTER BAND gradient (for text visibility) - NEW
+    # Starts at content area and extends down
+    center_start = 400
+    center_height = 450
+    for y in range(center_height):
+        # Fade in, stay strong, fade out
+        progress = y / center_height
+        if progress < 0.2:
+            alpha = int(180 * (progress / 0.2))
+        elif progress > 0.8:
+            alpha = int(180 * ((1 - progress) / 0.2))
+        else:
+            alpha = 180
+        for x in range(width):
+            overlay.putpixel((x, center_start + y), (0, 0, 0, alpha))
+    
+    # Bottom gradient (for website visibility)
+    bottom_height = 120
     start_y = height - bottom_height
     for y in range(bottom_height):
-        alpha = int(220 * (y / bottom_height))
+        alpha = int(200 * (y / bottom_height))
         for x in range(width):
             overlay.putpixel((x, start_y + y), (0, 0, 0, alpha))
     
@@ -367,28 +392,30 @@ def render_slide(image_source, headline="", big_text="", description="",
         header_gradient = create_header_gradient(CANVAS_WIDTH, CANVAS_HEIGHT, HEADER_GRADIENT_HEIGHT)
         canvas = Image.alpha_composite(canvas, header_gradient)
         text_color = BLACK
-        subtitle_color = GRAY_SUBTITLE
+        subtitle_color = (40, 40, 40)  # Very dark for light backgrounds
     else:
         overlay = create_gradient_overlay(CANVAS_WIDTH, CANVAS_HEIGHT)
         canvas = Image.alpha_composite(canvas, overlay)
         text_color = WHITE
-        subtitle_color = (200, 200, 200)
+        subtitle_color = WHITE  # WHITE for dark backgrounds
     
     # Create draw object
     draw = ImageDraw.Draw(canvas)
     
-    # === HEADER: Logo (WHITE logo on dark gradient) ===
+    # === HEADER: Logo (WHITE logo on dark gradient) - LEFT ===
     logo = load_logo()
     if logo:
         canvas.paste(logo, (MARGIN_LEFT, MARGIN_TOP), logo)
     
-    # === HEADER: Tagline IN WHITE (always visible on dark gradient) ===
+    # === HEADER: Tagline IN WHITE - ALIGNED RIGHT ===
     # Show tagline on ALL slides for brand consistency
     tagline = DEFAULT_TAGLINE
-    logo_width = logo.width if logo else 0
-    # Tagline in WHITE since it's on dark gradient
+    # Calculate tagline width to align right
+    tagline_bbox = draw.textbbox((0, 0), tagline, font=tagline_font)
+    tagline_width = tagline_bbox[2] - tagline_bbox[0]
+    tagline_x = CANVAS_WIDTH - MARGIN_RIGHT - tagline_width  # Right aligned
     draw.text(
-        (MARGIN_LEFT + logo_width + 20, MARGIN_TOP + 15),
+        (tagline_x, MARGIN_TOP + 15),
         tagline,
         font=tagline_font,
         fill=WHITE  # WHITE text on dark gradient
@@ -438,14 +465,18 @@ def render_slide(image_source, headline="", big_text="", description="",
             draw.text((MARGIN_LEFT, current_y), line, font=description_font, fill=subtitle_color)
             current_y += line_height
     
-    # === FOOTER: Website ===
+    # === FOOTER: Website - ALIGNED RIGHT ===
     if show_website:
         website = DEFAULT_WEBSITE
+        # Calculate website width to align right
+        website_bbox = draw.textbbox((0, 0), website, font=website_font)
+        website_width = website_bbox[2] - website_bbox[0]
+        website_x = CANVAS_WIDTH - MARGIN_RIGHT - website_width  # Right aligned
         draw.text(
-            (MARGIN_LEFT, CANVAS_HEIGHT - MARGIN_BOTTOM - 25),
+            (website_x, CANVAS_HEIGHT - MARGIN_BOTTOM - 25),
             website,
             font=website_font,
-            fill=subtitle_color if not is_light_theme else GRAY_LIGHT
+            fill=WHITE  # Always WHITE for visibility
         )
     
     return canvas
